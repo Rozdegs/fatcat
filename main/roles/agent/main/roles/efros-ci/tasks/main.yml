@@ -1,0 +1,25 @@
+---
+# Создаём пользователя efrosci, используя уже переданный пароль
+
+- name: Создать пользователя efrosci
+  user:
+    name: efrosci
+    password: "{{ user_password | password_hash('sha512') }}"
+    shell: /bin/bash
+    state: present
+    create_home: yes
+
+# Проверяем, есть ли наш блок в /etc/sudoers
+- name: Проверить наличие блока EFROSCI в /etc/sudoers
+  shell: "grep -q '# BEGIN EFROSCI BLOCK' /etc/sudoers"
+  register: efrosci_block
+  ignore_errors: yes
+
+# Добавляем sudo-блок, если его нет
+- name: Добавить блок EFROSCI в /etc/sudoers, если его нет
+  blockinfile:
+    dest: /etc/sudoers
+    marker: "# {mark} EFROSCI BLOCK"
+    block: "{{ lookup('file', role_path + '/files/efrosci_sudoers') }}"
+    validate: 'visudo -cf %s'
+  when: efrosci_block.rc != 0

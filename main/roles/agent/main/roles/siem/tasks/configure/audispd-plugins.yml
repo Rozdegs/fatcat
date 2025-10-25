@@ -1,0 +1,35 @@
+---
+- name: Getting Auditd version
+  shell: out=$(/sbin/auditctl -v) && echo ${out} | /usr/bin/cut --delimiter " " --fields 3
+  register: auditd_installed_ver
+
+- name: Modifying audispd-plugins config file (Auditd v2)
+  when: auditd_installed_ver.stdout < '3'
+  lineinfile:
+    path: "{{ audispd_plugin_config_v2 }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^active', line: 'active = yes' }
+    - { regexp: '^args', line: 'args = LOG_LOCAL6' }
+
+- name: Modifying audispd-plugins config file (Auditd v3)
+  when: auditd_installed_ver.stdout >= '3.0'
+  lineinfile:
+    path: "{{ audispd_plugin_config_v3 }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^active', line: 'active = yes' }
+    - { regexp: '^args', line: 'args = LOG_LOCAL6' }
+
+- name: Restarting Auditd service (Debian-based)
+  when: radhat_famaly == "false"
+  service:
+    name: auditd
+    state: restarted
+
+- name: Restarting Auditd service (RHEL-based)
+  when: radhat_famaly == "true"
+  shell: "service auditd restart"
+

@@ -1,0 +1,41 @@
+---
+- name: Replace multiple config files with backup
+  hosts: servers # хосты, на котороых будет запущен плейбук
+  become: yes # выполнение задач с повышением привелегий
+  become_method: sudo # механизм повышения привелегий
+  become_user: root # пользователь для выполнения задач после повышения привелегий
+
+  vars:
+    config_files: # конфигурационные файлы 
+      - { target: /etc/pam.d/common-auth,  new: configure/pam.d/common-auth }
+      - { target: /etc/pam.d/common-password,  new: configure/pam.d/common-password }
+      - { target: /etc/pam.d/common-account, new: configure/pam.d/common-account }
+      - { target: /etc/pam.d/su, new: configure/pam.d/su }
+      - { target: /etc/ssh/sshd_config, new: configure/sshd_config }
+      - { target: /etc/login.defs, new: configure/login.defs }
+      - { target: /etc/logrotate.conf, new: configure/logrotate.conf }
+
+  tasks:
+    - name: Backup old file # бэкап конфигурационного файла
+      copy:
+        src: "{{ item.target }}"
+        dest: "{{ item.target }}.backup_{{ ansible_date_time.iso8601 }}"
+        remote_src: yes
+        backup: no
+      loop: "{{ config_files }}" #повторить этот task со всеми vars
+
+    - name: Replace with new file # замена конфигурационного файла
+      copy:
+        src: "{{ item.new }}"
+        dest: "{{ item.target }}"
+        owner: root
+        group: root
+        mode: '0640'
+      loop: "{{ config_files }}" #повторить этот task со всеми vars
+      notify: Restart ssh service
+
+  handlers:
+    - name: Restart ssh service #рестарт службы sshd
+      systemd:  
+        name: ssh 
+        state: restarted

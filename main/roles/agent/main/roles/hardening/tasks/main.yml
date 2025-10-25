@@ -1,0 +1,4 @@
+---
+- name: hardering
+  become: yes
+  import_tasks: configure/hardering.yml

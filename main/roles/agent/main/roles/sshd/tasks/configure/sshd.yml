@@ -1,0 +1,42 @@
+---
+- name: "Бэкап sshd_config"
+  copy:
+    src: /etc/ssh/sshd_config
+    dest: "/etc/ssh/sshd_config.{{ ansible_date_time.iso8601_basic_short }}.bak"
+    remote_src: yes
+
+- name: "Сохранение AllowUsers (if any)"
+  shell: "grep -E '^AllowUsers' /etc/ssh/sshd_config || true"
+  register: allowusers_line
+
+- name: "Сохранение AllowGroups (if any)"
+  shell: "grep -E '^AllowGroups' /etc/ssh/sshd_config || true"
+  register: allowgroups_line
+
+- name: "Замена sshd_config новым файлом"
+  template:
+    src: sshd_config
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: '0600'
+  notify: Restart ssh service
+
+- name: "Настройка AllowUsers"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^AllowUsers'
+    line: "AllowUsers {{ (allowusers_line.stdout | regex_replace('^AllowUsers', '') | trim | default('') ).split(' ') | union(new_users) | join(' ') }}"
+    insertafter: EOF
+    state: present
+  notify: Restart ssh service
+
+- name: "Настройка AllowGroups"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^AllowGroups'
+    line: "AllowGroups {{ (allowgroups_line.stdout | regex_replace('^AllowGroups', '') | trim | default('') ).split(' ') | union(new_groups) | join(' ') }}"
+    insertafter: EOF
+    state: present
+  notify: Restart ssh service
+

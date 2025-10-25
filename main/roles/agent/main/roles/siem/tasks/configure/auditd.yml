@@ -1,0 +1,67 @@
+---
+- name: Getting UID_MIN value
+  shell: /bin/grep '^UID_MIN' /etc/login.defs | /usr/bin/awk '{print $2}'
+  register: uid_min_value
+
+- name: Backing up existing rules
+  shell:
+    chdir: "{{ auditd_rules_dir }}"
+    cmd: test -f ./*.rules && /bin/tar --append --file "{{ auditd_rules_bak_name }}" --exclude "'{{ auditd_siem_ruleset }}'" --remove-files ./*.rules || true
+
+- name: Pushing Auditd SIEM ruleset
+  template:
+    src: auditd_00-siem.rules.j2
+    dest: "{{ auditd_rules_dir }}{{ auditd_siem_ruleset }}"
+    owner: root
+    group: root
+    mode: 0644
+  vars:
+    uid_min: "{{ uid_min_value.stdout }}"
+
+- name: Checking Auditd ruleset
+  shell: /sbin/auditctl -R "{{ auditd_rules_dir }}{{ auditd_siem_ruleset }}"
+
+- name: Modifying Auditd config file
+  lineinfile:
+    path: "{{ auditd_config }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^log_format', line: 'log_format = ENRICHED' }
+    - { regexp: '^max_log_file', line: 'max_log_file = 10' }
+    - { regexp: '^num_logs', line: 'num_logs = 20' }
+    - { regexp: '^name_format', line: 'name_format = FQD' }
+    - { regexp: '^disp_qos', line: 'disp_qos = lossless' }
+    - { regexp: '^admin_space_left_action', line: 'admin_space_left_action = SYSLOG' }
+    - { regexp: '^disk_full_action', line: 'disk_full_action = SYSLOG' }
+    - { regexp: '^disk_error_action', line: 'disk_error_action = SYSLOG' }
+    - { regexp: '^max_log_file_action', line: 'max_log_file_action = ROTATE' }
+
+- name: Disable log writing for highload systems
+  when: not auditd_write_logs
+  lineinfile:
+    path: "{{ auditd_config }}"
+    regexp: '^write_logs'
+    line: 'write_logs = no'
+
+- name: Disable systemd journal audit socket
+  systemd:
+    name: systemd-journald-audit.socket
+    state: 'stopped'
+    enabled: false
+    masked: yes
+  ignore_errors: true
+
+- name: ANSIBLE VARIABLE ---------------- radhat_famaly
+  debug:
+    msg: "{{ radhat_famaly }}"
+
+- name: Restarting Auditd service (Debian-based)
+  when: radhat_famaly == "false"
+  service:
+    name: auditd
+    state: restarted
+
+- name: Restarting Auditd service (RHEL-based)
+  when: radhat_famaly == "true"
+  shell: "service auditd restart"

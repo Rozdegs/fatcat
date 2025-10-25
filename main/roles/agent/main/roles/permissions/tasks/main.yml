@@ -1,0 +1,22 @@
+---
+- name: "Установка прав на указанные файлы"
+  file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+    state: file
+  with_items: "{{ files_permissions }}"
+  failed_when: false
+  ignore_errors: yes
+
+- name: "Установка прав на указанные директории"
+  file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+    state: directory
+  with_items: "{{ directories_permissions }}"
+  failed_when: false
+  ignore_errors: yes

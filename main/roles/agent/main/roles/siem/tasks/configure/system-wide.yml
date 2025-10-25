@@ -1,0 +1,54 @@
+---
+# !!! DON'T CHANGE THIS unless you know exactly what you do !!!
+- name: Modifying /etc/hosts file
+  when: modify_etc_hosts
+  block:
+    - name: Commenting localhost in /etc/hosts
+      replace:
+        path: /etc/hosts
+        regexp: '^(127.*)$'
+        replace: '###SIEM### \1'
+
+    - name: Checking host utility
+      shell: /usr/bin/host -V 2>/dev/null && echo true || echo false
+      register: host_util_exists
+
+    - name: Getting hostname
+      block:
+        - name: Getting short hostname
+          shell: /bin/hostname --short
+          register: out
+
+        - set_fact:
+            hostname_short: "{{ out.stdout }}"
+
+        - name: Getting FQDN hostname
+          shell: /bin/hostname --fqdn
+          register: out
+
+        - set_fact:
+            hostname_fqdn: "{{ out.stdout }}"
+
+    - name: Getting IP address (host)
+      when: host_util_exists.stdout == 'true'
+      block:
+        - shell: /usr/bin/host "{{ hostname_fqdn }}" | /usr/bin/awk '{print $4}'
+          register: out
+
+        - set_fact:
+            ip_address: "{{ out.stdout }}"
+
+    - name: Getting IP address (getent)
+      when: host_util_exists.stdout == 'false'
+      block:
+        - shell: /usr/bin/getent hosts "{{ hostname_fqdn }}" | /usr/bin/awk '{print $1}'
+          register: out
+
+        - set_fact:
+            ip_address: "{{ out.stdout }}"
+
+    - name: Insert self addresses in /etc/hosts
+      lineinfile:
+        dest: /etc/hosts
+        line: "{{ ip_address }} {{ hostname_fqdn }} {{ hostname_short }}"
+        state: present

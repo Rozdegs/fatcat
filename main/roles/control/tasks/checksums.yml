@@ -1,0 +1,27 @@
+---
+# Проверка совпадения файлов fatcat-agent по MD5
+
+- name: Получить MD5 локального файла fatcat-agent
+  delegate_to: localhost
+  command: md5sum {{ playbook_dir }}/roles/agent/fatcat-agent
+  register: local_md5
+  run_once: true
+
+- name: Получить MD5 удалённого файла fatcat-agent
+  shell: md5sum /opt/fatcat/fatcat-agent
+  register: remote_md5
+  ignore_errors: yes
+
+- name: Сравнить MD5 суммы
+  set_fact:
+    fatcat_files_equal: "{{ local_md5.stdout.split()[0] == remote_md5.stdout.split()[0] }}"
+
+- name: Вывести результат сравнения
+  debug:
+    msg: >
+      Файл /opt/fatcat/fatcat-agent на хосте {{ inventory_hostname }}
+      {% if fatcat_files_equal %}
+        совпадает с локальной версией
+      {% else %}
+        отличается
+      {% endif %}

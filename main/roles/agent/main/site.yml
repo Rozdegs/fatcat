@@ -1,0 +1,16 @@
+---
+- hosts: all
+  any_errors_fatal: false
+  become: yes
+
+  vars_files:
+    - "vaults/{{ inventory_hostname }}.yml"
+
+  vars:
+    selected_roles: []
+
+  tasks:
+    - name: Run selected roles
+      include_role:
+        name: "{{ item }}"
+      loop: "{{ selected_roles }}"

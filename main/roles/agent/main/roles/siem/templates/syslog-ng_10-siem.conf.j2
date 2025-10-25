@@ -1,0 +1,10 @@
+filter pt_siem_filter { not facility(mail, lpr, news, uucp, cron); };
+{% for agent in facilities.get(facility) %}
+{% if agent.transport == 'udp' %}
+destination {{ facility }}_siem_agent_udp { udp("{{ agent.address }}" port({{ agent.port }})); };
+log { source(s_src); filter(pt_siem_filter); destination({{ facility }}_siem_agent_udp); };
+{% else %}
+destination {{ facility }}_siem_agent_tcp { tcp("{{ agent.address }}" port({{ agent.port }}) log-fifo-size(1000)); };
+log { source(s_src); filter(pt_siem_filter); destination({{ facility }}_siem_agent_tcp); flags(flow-control); };
+{% endif %}
+{% endfor %}

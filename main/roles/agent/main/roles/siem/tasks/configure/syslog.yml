@@ -1,0 +1,17 @@
+---
+- name: Detecting syslog daemon name
+  shell: /usr/bin/pgrep --exact --list-name "{{ syslog_options }}" | /usr/bin/awk '{print $2}'
+  register: syslog_pid_name
+  ignore_errors: yes
+
+- set_fact:
+    syslog_name: "{{ syslog_pid_name.stdout }}"
+  when: syslog_pid_name.stdout != ''
+
+- name: Configuring rsyslog
+  when: syslog_name == 'rsyslogd'
+  import_tasks: configure/rsyslogd.yml
+
+- name: Configuring syslog-ng
+  when: syslog_name == 'syslog-ng'
+  import_tasks: configure/syslog-ng.yml

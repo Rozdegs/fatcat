@@ -1,0 +1,5 @@
+---
+facilities:
+  default:
+    - { address: 'HOST.FQDN', transport: 'udp', port: '514' }
+

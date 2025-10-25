@@ -1,0 +1,81 @@
+---
+- name: Include agent group config file
+  include_vars:
+    file: siem_agents.yml
+
+- name: Checking IncludeConfig option
+  shell: /bin/grep --silent '^include(file="/etc/rsyslog.d/\*.conf"\|^$IncludeConfig /etc/rsyslog.d/\*.conf' "{{ rsyslog_config }}" && echo true || echo false
+  register: includeconfig_exists
+
+- name: Inserting comment
+  lineinfile:
+    dest: "{{ rsyslog_config }}"
+    line: '### SIEM directives'
+    insertafter: '[Ww]orkDirectory'
+    state: present
+
+- name: Adding IncludeConfig option
+  when: includeconfig_exists.stdout == 'false'
+  lineinfile:
+    dest: "{{ rsyslog_config }}"
+    line: $IncludeConfig "{{ rsyslog_siem_config }}"
+    insertafter: '### SIEM directives'
+    firstmatch: yes
+    state: present
+
+- name: Setting up options
+  lineinfile:
+    dest: "{{ rsyslog_config }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    insertafter: '### SIEM directives'
+    state: present
+  with_items: "{{ rsyslog_options }}"
+
+- name: Checking if journald is used
+  shell: /bin/grep --silent '^module(load="imjournal"\|^$ModLoad imjournal' "{{ rsyslog_config }}" && echo true || echo false
+  register: journald_is_used
+
+
+- name: Setting up rsyslog options for journald
+  when: journald_is_used.stdout == 'true'
+  lineinfile:
+    dest: "{{ rsyslog_config }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    insertafter: '### SIEM directives'
+    state: present
+  with_items:
+    - { regexp: '^$imjournalRatelimitBurst', line: '$imjournalRatelimitBurst 20000' }
+    - { regexp: '^$imjournalRatelimitInterval', line: '$imjournalRatelimitInterval 15' }
+
+- name: Setting up rsyslog additional options
+  when: journald_is_used.stdout == 'false'
+  lineinfile:
+    dest: "{{ rsyslog_config }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    insertafter: '### SIEM directives'
+    state: present
+  with_items:
+    - { regexp: '^$SystemLogRatelimitBurst', line: '$SystemLogRatelimitBurst 20000' }
+    - { regexp: '^$SystemLogRatelimitInterval', line: '$SystemLogRatelimitInterval 15' }
+
+- name: Pushing rsyslog SIEM config
+  template:
+    src: rsyslog_10-siem.conf.j2
+    dest: "{{ rsyslog_siem_config }}"
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Restarting rsyslog service
+  service:
+    name: rsyslog
+    state: restarted
+
+- name: Restarting journald service
+  when: journald_is_used.stdout == 'true'
+  service:
+    name: systemd-journald
+    state: restarted

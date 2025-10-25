@@ -1,0 +1,14 @@
+---
+config_files:
+  - target: /etc/pam.d/common-auth
+    new: pam.d/common-auth
+  - target: /etc/pam.d/common-password
+    new: pam.d/common-password
+  - target: /etc/pam.d/common-account
+    new: pam.d/common-account
+  - target: /etc/pam.d/su
+    new: pam.d/su
+  - target: /etc/login.defs
+    new: login.defs
+  - target: /etc/logrotate.conf
+    new: logrotate.conf

@@ -1,0 +1,9 @@
+auth       sufficient pam_rootok.so
+session       required   pam_env.so readenv=1
+session       required   pam_env.so readenv=1 envfile=/etc/default/locale
+@include common-auth
+@include common-account
+@include common-session
+session required pam_parsec_cap.so
+
+

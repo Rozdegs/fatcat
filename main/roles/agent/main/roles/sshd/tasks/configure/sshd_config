@@ -1,0 +1,20 @@
+Include /etc/ssh/sshd_config.d/*.conf
+PermitRootLogin no
+MaxAuthTries 5
+ChallengeResponseAuthentication no
+UsePAM yes
+AllowTcpForwarding no
+X11Forwarding no
+X11UseLocalhost no
+PrintMotd no
+PrintLastLog yes
+ClientAliveInterval 300
+ClientAliveCountMax 0
+
+# Allow client to pass locale environment variables
+AcceptEnv LANG LC_*
+
+# override default of no subsystems
+Subsystem       sftp    /usr/lib/openssh/sftp-server
+
+# AllowUsers and AllowGroups added by the fatcat script

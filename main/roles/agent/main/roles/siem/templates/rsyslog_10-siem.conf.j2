@@ -1,0 +1,11 @@
+{% for agent in facilities.get(facility) %}
+{% if agent.transport == 'udp' %}
+*.info;local6.*;mail.none;lpr.none;news.none;uucp.none;cron.none     @{{ agent.address }}:{{ agent.port }}
+{% else %}
+*.info;local6.*;mail.none;lpr.none;news.none;uucp.none;cron.none     @@{{ agent.address }}:{{ agent.port }}
+{% endif %}
+{% endfor %}
+
+{% if auditd_write_logs|bool %}
+local6.* stop
+{% endif %}

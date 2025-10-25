@@ -1,0 +1,28 @@
+---
+- name: Бэкап файлов конфигурации
+  copy:
+    src: "{{ item.target }}"
+    dest: "{{ item.target }}.backup_{{ ansible_date_time.iso8601 }}"
+    remote_src: yes
+    backup: no
+  loop: "{{ config_files }}"
+  when: config_files is defined
+
+- name: Замена файлов конфигурации
+  copy:
+    src: "{{ item.new }}"
+    dest: "{{ item.target }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ config_files }}"
+  when: config_files is defined
+
+- name: Убрать NOPASSWD для группы astra-admin
+  replace:
+    path: /etc/sudoers
+    regexp: '^%astra-admin\s+ALL=\(ALL:ALL\)\s+NOPASSWD: ALL'
+    replace: '%astra-admin ALL=(ALL:ALL) ALL'
+
+- name: Проверка синтаксиса sudoers
+  command: visudo -cf /etc/sudoers

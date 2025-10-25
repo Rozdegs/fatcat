@@ -1,0 +1,24 @@
+---
+
+
+
+- name: ANSIBLE VARIABLE    os_family
+  debug:
+    msg: "{{ ansible_facts }}"
+
+- name: Configuring system-wide parameters
+  become: yes
+  import_tasks: configure/system-wide.yml
+
+- name: Configuring Auditd
+  become: yes
+  import_tasks: configure/auditd.yml
+
+- name: Configuring audispd-plugins
+  become: yes
+  import_tasks: configure/audispd-plugins.yml
+
+- name: Configuring syslog
+  become: yes
+  import_tasks: configure/syslog.yml
+

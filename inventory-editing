@@ -1,0 +1,129 @@
+#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE="$SCRIPT_DIR/main"
+INVENTORY="$BASE/inventory/inventory-editing.ini"
+
+# Логирование
+log() {
+    local module="$1"      # Модуль или часть скрипта (inventory, fatcat_agent, fatcat_control)
+    local status="$2"      # success / failure / ongoing
+    local action="$3"      # Что произошло
+
+    local user=$(whoami)
+    local hostname=$(hostname)
+
+    local log_line="host=$hostname script=fatcat-control module=$module user=$user status=$status action=$action"
+#   log "inventory" "Добавлен новый хост" "success"
+
+    # Отправка в syslog
+    logger -t fatcat "$log_line"
+}
+
+# Проверка наличия пакетов
+check_packages() {
+    local packages=("whiptail")
+    for pkg in "${packages[@]}"; do
+        if ! dpkg -s "$pkg" &>/dev/null; then
+            read -p "Пакет '$pkg' не найден. Установить его? (y/n): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                apt-get install -y "$pkg" >> "$LOG_FILE" 2>&1
+                log "system" "ongoing" "Пакет $pkg установлен"
+            else
+                log "system" "ongoing" "Пакет $pkg не установлен пользователем"
+                exit 1
+            fi
+        fi
+    done
+}
+# Проверяем пакеты
+check_packages
+
+while true; do
+  CHOICE=$(whiptail --title "Управление инвентарем" --menu "\nФайл инвентаря $INVENTORY\nВыберите действие:" 20 60 10 \
+    "1" "Добавить хост" \
+    "2" "Удалить хост" \
+    "3" "Просмотреть инвентарь" \
+    "4" "Выход" 3>&1 1>&2 2>&3)
+
+  case $CHOICE in
+    1)
+      # Выбор группы
+      GROUP=$(whiptail --title "Выбор группы" --menu "Выберете ОС хоста:" 15 50 2 \
+      "AstraLinux" "" \
+      "RedOS" "" 3>&1 1>&2 2>&3)
+      # Скрытые переменные
+     # case $GROUP in
+     #     "AstraLinux")
+     #         radhat_famaly="radhat_famaly=false"
+     #     ;;
+     #     "RedOS")
+     #         radhat_famaly="radhat_famaly=true"
+     #     ;;
+     #  esac
+
+
+      # Провека на отмену
+      [ $? -ne 0 ] && exit 1
+
+      # Ввод IP
+      HOST=$(whiptail --inputbox "Введите IP-адрес хоста:" 10 50 3>&1 1>&2 2>&3)
+
+      # Проверка на пустоту и валидность
+      if [[ -z "$HOST" ]]; then
+        whiptail --msgbox "Хост не введен" 8 40
+        exit 1
+      fi
+
+      if ! [[ "$HOST" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        whiptail --msgbox "Некорректный IP-адрес" 8 50
+        exit 1
+      fi
+
+      # Добавление хоста
+      if ! grep -q "^$HOST$" "$INVENTORY"; then
+        # Проверяем существование групп
+          group_exists=$(grep -c "^\[$GROUP\]$" "$INVENTORY")
+          group_var_exists=$(grep -c "^\[$GROUP:var\]$" "$INVENTORY")
+          if [ "$group_exists" -eq 0 ] || [ "$group_var_exists" -eq 0 ]; then
+            # Добавляем недостающие группы
+            [ "$group_exists" -eq 0 ] && echo -e "\n[$GROUP]" >> "$INVENTORY"
+          #  [ "$group_var_exists" -eq 0 ] && echo -e "\n[$GROUP:var]" >> "$INVENTORY"  && echo -e "$radhat_famaly" >> "$INVENTORY"
+          fi
+        awk -v grp="[$GROUP]" -v host="$HOST" '
+          $0 == grp {print; print host; next} {print}
+        ' "$INVENTORY" > "$INVENTORY.tmp" && mv "$INVENTORY.tmp" "$INVENTORY"
+        whiptail --msgbox "Хост $HOST добавлен в группу [$GROUP]" 8 50
+        log "inventory-editing" "success" "Хост $HOST добавлен в группу $GROUP"
+      else
+        whiptail --msgbox "Хост $HOST уже добавлен в инвентарь" 8 50
+      fi
+      ;;
+    2)
+      # Запрашиваем IP для удаления
+      REMOVE_IP=$(whiptail --inputbox "Введите IP для удаления:" 10 60 3>&1 1>&2 2>&3)
+
+      # Если поле пустое — пропускаем
+      if [[ -z "$REMOVE_IP" ]]; then
+        whiptail --msgbox "Поле ввода пустое. Удаление отменено." 10 60
+        continue
+      fi
+
+      # Проверка точного совпадения IP в первом токене строки
+      if grep -qE "^$REMOVE_IP(\s|$)" "$INVENTORY"; then
+        # удаляем только точное совпадение первого токена
+        sed -i "/^$REMOVE_IP[[:space:]]\?/d" "$INVENTORY"
+        whiptail --msgbox "Хост $REMOVE_IP удален из инвентаря" 10 60
+        log "inventory-editing" "success" "Хост $REMOVE_IP удален из инвентаря"
+      else
+        whiptail --msgbox "Хост $REMOVE_IP не найден в инвентаре" 10 60
+      fi
+      ;;
+    3)
+      whiptail --textbox "$INVENTORY" 20 70
+      ;;
+    4|*)
+      break
+      ;;
+  esac
+done

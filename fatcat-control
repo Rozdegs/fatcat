@@ -1,0 +1,223 @@
+#!/bin/bash
+
+LOG_FILE="/var/log/fatcat_deploy.log"
+PLAYBOOK="$(dirname "$0")/main/site.yml"
+INVENTORY_DIR="$(dirname "$0")/main/inventory"         # Папка с инвентарями
+INVENTORIES=($(ls "$INVENTORY_DIR"/*.ini 2>/dev/null)) # Находим все ini-файлы
+INVENTORY_BASH="$SCRIPT_DIR/inventory-editing"         # Путь до скрипта для редактирования инвентария
+
+# Функция логирования
+log() {
+    local module="$1"      # Модуль или часть скрипта (inventory, fatcat_agent, fatcat_control)
+    local status="$2"      # success / failure / ongoing
+    local action="$3"      # Что произошло
+
+    local user=$(whoami)
+    local hostname=$(hostname)
+
+    local log_line="host=$hostname script=fatcat-control module=$module user=$user status=$status action=$action"
+#   log "inventory" "success" "Добавлен новый хост"
+
+    # Отправка в syslog
+    logger -t fatcat "$log_line"
+}
+
+# Проверка наличия пакетов
+check_packages() {
+    local packages=("ansible" "whiptail" "sshpass")
+    for pkg in "${packages[@]}"; do
+        if ! dpkg -s "$pkg" &>/dev/null; then
+            read -p "Пакет '$pkg' не найден. Установить его? (y/n): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                apt-get install -y "$pkg" >> "$LOG_FILE" 2>&1
+                log "system" "ongoing" "Пакет $pkg установлен"
+            else
+                log "system" "ongoing" "Пакет $pkg не установлен пользователем"
+                exit 1
+            fi
+        fi
+    done
+}
+# Проверяем пакеты
+check_packages
+
+# Приветственный экран
+whiptail --title "Fatcat Control Node" --msgbox "Добро пожаловать в Fatcat Control\n
+Функции:
+1. Распространение роли Agent на удаленные серверы.
+2. Обновление файлов при изменениях.
+3. Проверка целостности с помощью контрольных сумм.\n" 15 60
+
+# Выбор инвентаря
+# Проверка наличия файлов
+if [ ${#INVENTORIES[@]} -eq 0 ]; then
+  whiptail --msgbox "В каталоге $INVENTORY_DIR нет файлов инвентаря (*.ini)" 10 60
+  exit 1
+fi
+
+# Формируем список для меню
+MENU_ITEMS=()
+for inv in "${INVENTORIES[@]}"; do
+  MENU_ITEMS+=("$(basename "$inv")" " ")
+done
+
+# Выбор через псевдографику
+SELECTED_INVENTORY=$(whiptail --title "Выбор инвентаря" \
+  --menu "Выберите файл инвентаря для запуска Fatcat Control:" 20 40 10 \
+  "${MENU_ITEMS[@]}" \
+  3>&1 1>&2 2>&3)
+
+# Проверка выбора
+if [ -z "$SELECTED_INVENTORY" ]; then
+  whiptail --msgbox "Выбор отменен. Скрипт завершен." 10 60
+  exit 0
+fi
+
+# Полный путь до инвентаря
+INVENTORY_PATH="$INVENTORY_DIR/$SELECTED_INVENTORY"
+
+# Запрос подтверждения запуска
+HOSTS=$(grep -vE '^\s*($|#|\[)' "$INVENTORY_PATH" | tr -d '\r')
+if ! whiptail --title "Запуск " \
+    --yesno "Установка роли Fatcat Agent будет запущена на хостах:\n\n$HOSTS" 15 60; then
+    exit 0
+fi
+
+
+# ------------------ НАЧАЛО БЛОКА ДЛЯ VAULT ------------------
+VAULT_DIR="$(dirname "$0")/main/vaults"
+VAULT_PASS_FILE="$(dirname "$0")/main/.vault_pass"
+USER_RUN="$(whoami)"
+
+# Создаём каталог для vault-файлов
+mkdir -p "$VAULT_DIR"
+chown "$USER_RUN":"$USER_RUN" "$VAULT_DIR" 2>/dev/null || true
+chmod 700 "$VAULT_DIR"
+
+# Если отсутствует файл с master-паролем для ansible-vault — предложим создать
+if [ ! -f "$VAULT_PASS_FILE" ]; then
+  if whiptail --yesno "Файл с master-паролем для Ansible Vault ($VAULT_PASS_FILE) не найден. Создать его?" 10 60; then
+    MASTER_PASS=$(whiptail --passwordbox "Введите мастер-пароль для Ansible Vault (будет сохранён в $VAULT_PASS_FILE):" 10 60 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$MASTER_PASS" ]; then
+      whiptail --msgbox "Мастер-пароль не введён. Скрипт требует master-пароль для создания зашифрованных credential'ов. Завершение." 10 60
+      exit 1
+    fi
+    printf "%s" "$MASTER_PASS" > "$VAULT_PASS_FILE"
+    chmod 600 "$VAULT_PASS_FILE"
+    chown "$USER_RUN":"$USER_RUN" "$VAULT_PASS_FILE" 2>/dev/null || true
+    whiptail --msgbox "Файл $VAULT_PASS_FILE создан и защищён (chmod 600)." 8 60
+  else
+    whiptail --msgbox "Без master-пароля Vault работать не будет. Выход." 8 50
+    exit 1
+  fi
+fi
+
+# Получаем список хостов из инвентаря (строки без секций и без переменных)
+HOST_LIST=$(grep -vE '^\s*($|#|\[|.*=.*)' "$INVENTORY_PATH" | tr -d '\r' | awk '{print $1}')
+
+# Функция для создания/обновления vault-файла для хоста
+create_or_update_vault() {
+  local host="$1"
+  local ssh_pass="$2"
+  local become_pass="$3"
+  local tmp_plain tmp_enc dest
+
+  tmp_plain="$(mktemp /tmp/${host}_vault.XXXX)"
+  dest="${VAULT_DIR}/${host}.yml"
+
+  # Собираем yaml (без лишних данных)
+  printf "ansible_ssh_pass: \"%s\"\n" "$ssh_pass" > "$tmp_plain"
+  if [ -n "$become_pass" ]; then
+    printf "ansible_become_pass: \"%s\"\n" "$become_pass" >> "$tmp_plain"
+  fi
+
+  # Шифруем временный файл (ansible-vault заменит tmp_plain на зашифрованный файл)
+  ansible-vault encrypt "$tmp_plain" --vault-password-file "$VAULT_PASS_FILE" >/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    rm -f "$tmp_plain"
+    echo "Ошибка: ansible-vault не смог зашифровать данные для $host" >&2
+    return 1
+  fi
+
+  # Перемещаем зашифрованный файл в каталог vaults
+  mv "$tmp_plain" "$dest"
+  chown "$USER_RUN":"$USER_RUN" "$dest" 2>/dev/null || true
+  chmod 600 "$dest"
+  return 0
+}
+
+# Собираем список хостов, для которых нет vault
+MISSING=()
+while IFS= read -r h; do
+  [ -z "$h" ] && continue
+  if [ ! -f "${VAULT_DIR}/${h}.yml" ]; then
+    MISSING+=("$h")
+  fi
+done <<< "$HOST_LIST"
+
+# Запоминаем SSH пользователя — один раз
+SSH_USER=$(whiptail --inputbox "Введите имя пользователя SSH для подключения (будет использовано по умолчанию):" 10 60 "adminkii" --title "SSH User" 3>&1 1>&2 2>&3)
+if [ $? -ne 0 ] || [ -z "$SSH_USER" ]; then
+  whiptail --msgbox "SSH пользователь не введён — завершение." 8 50
+  exit 1
+fi
+
+# Если есть хосты без vault'а — предложим создать
+if [ ${#MISSING[@]} -gt 0 ]; then
+  # Покажем список и спросим - один пароль на всех или по каждому хосту
+  if whiptail --yesno "Не найдены зашифрованные credentials для хостов:\n\n${MISSING[*]}\n\nСоздать один пароль для всех этих хостов?" 15 70; then
+    # Один пароль для всех
+    SSH_PASS_ALL=$(whiptail --passwordbox "Введите SSH-пароль для всех указанных хостов:" 10 60 3>&1 1>&2 2>&3)
+    if [ $? -ne 0 ] || [ -z "$SSH_PASS_ALL" ]; then
+      whiptail --msgbox "Пароль не введён. Пропускаем создание vault'ов." 8 50
+    else
+      # Спросим, записывать ли sudo-пароль тоже
+      if whiptail --yesno "Задать также пароль sudo (become) для всех хостов?" 10 60; then
+        BECOME_PASS_ALL=$(whiptail --passwordbox "Введите пароль sudo для всех:" 10 60 3>&1 1>&2 2>&3)
+      else
+        BECOME_PASS_ALL=""
+      fi
+      for h in "${MISSING[@]}"; do
+        create_or_update_vault "$h" "$SSH_PASS_ALL" "$BECOME_PASS_ALL" || whiptail --msgbox "Не удалось создать vault для $h" 8 50
+      done
+    fi
+  else
+    # Под каждый хост свой пароль
+    for h in "${MISSING[@]}"; do
+      if whiptail --yesno "Задать пароль для $h?" 10 60; then
+        PSSH=$(whiptail --passwordbox "Введите SSH-пароль для $h:" 10 60 3>&1 1>&2 2>&3)
+        if [ $? -ne 0 ] || [ -z "$PSSH" ]; then
+          whiptail --msgbox "Пароль не введён для $h. Пропускаем." 8 50
+	  continue
+        fi
+        if whiptail --yesno "Задать пароль sudo (become) для $h?" 10 60; then
+          PBECOME=$(whiptail --passwordbox "Введите пароль sudo для $h:" 10 60 3>&1 1>&2 2>&3)
+        else
+          PBECOME=""
+        fi
+        create_or_update_vault "$h" "$PSSH" "$PBECOME" || whiptail --msgbox "Не удалось создать vault для $h" 8 50
+      fi
+    done
+  fi
+fi
+
+
+# ------------------ КОНЕЦ БЛОКА ДЛЯ VAULT ------------------
+
+
+# Запуск плейбука
+  log "fatcat_control" "ongoing" "Запуск установки Fatcat Agent на хостах из инвентаря $SELECTED_INVENTORY"
+  ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i "$INVENTORY_PATH" "$PLAYBOOK" \
+  -u "$SSH_USER" \
+  --vault-password-file "$VAULT_PASS_FILE" \
+  --extra-vars "selected_roles=['control']" \
+
+
+if [ $? -eq 0 ]; then
+    whiptail --title "Готово" --msgbox "Установка Fatcat Agent успешно выполнена.\nПодробности см. в $LOG_FILE" 10 60
+    log "fatcat_control" "success" "Установка Fatcat Agent успешно выполнена"
+else
+    whiptail --title "Ошибка" --msgbox "Ошибка при установке Fatcat Agent.\nПодробности см. в $LOG_FILE" 10 60
+    log "fatcat_control" "failure" "Ошибка при установке Fatcat Agent"
+fi

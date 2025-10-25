@@ -1,0 +1,8 @@
+---
+- name: groups
+  become: yes
+  import_tasks: configure/group.yml
+
+- name: sshd_replace
+  become: yes
+  import_tasks: configure/sshd.yml

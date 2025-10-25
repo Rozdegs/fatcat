@@ -1,0 +1,29 @@
+cat <<EOF > .gitignore
+# Кеш и временные файлы
+__pycache__/
+*.retry
+*.log
+*.bak
+*.swp
+*.tmp
+
+# Файлы с паролями и секретами
+vault_pass
+.vault_pass
+vault_pass.txt
+*.key
+*.pem
+*.enc
+
+# Локальные данные
+inventory/*
+!inventory/example_inventory.ini
+
+# Бэкапы и архивы
+*.tar.gz
+*.zip
+
+# IDE и редакторы
+.vscode/
+.idea/
+EOF

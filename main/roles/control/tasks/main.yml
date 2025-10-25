@@ -1,0 +1,10 @@
+---
+- name: Бэкап роли Agent на удаленных узлах
+  include_tasks: backup.yml
+
+- name: Копирование роли Agent на удаленные узлы
+  include_tasks: copy_agent.yml
+
+- name: Проверка чек-суммы файлов
+  include_tasks: checksums.yml
+

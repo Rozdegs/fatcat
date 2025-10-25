@@ -1,0 +1,99 @@
+---
+###################################################################################################
+### Main configuration
+###################################################################################################
+
+# SIEM agent connection options
+#     Look at vars/siem_agents.yml
+
+# Use the bringed packages if the packages are not available in the repositories.
+#     Packages are placed in the roles/lep-src/files/packages directory.
+#     packages_dirs variable defines subdirectory names.
+upload_local_packages: false
+
+# If true then write Aditd logs to file
+auditd_write_logs: true
+
+# Modify /etc/hosts file
+# !!! DON'T CHANGE THIS unless you know exactly what you do !!!
+modify_etc_hosts: false
+
+
+###################################################################################################
+### Auditd options
+###################################################################################################
+
+auditd_config: /etc/audit/auditd.conf
+auditd_rules_dir: /etc/audit/rules.d/
+auditd_siem_ruleset: 00-siem.rules
+auditd_rules_bak_name: rules_backup.tar
+
+audispd_plugin_config_v2: /etc/audisp/plugins.d/syslog.conf
+audispd_plugin_config_v3: /etc/audit/plugins.d/syslog.conf
+
+
+###################################################################################################
+### Syslog options
+###################################################################################################
+
+# Possible syslog daemon options
+syslog_options: 'rsyslogd|syslog-ng'
+
+# rsyslog
+rsyslog_config: /etc/rsyslog.conf
+rsyslog_siem_config: /etc/rsyslog.d/10-siem.conf
+rsyslog_options:
+  - { regexp: '^\$RepeatedMsgReduction', line: '$RepeatedMsgReduction off' }
+  - { regexp: '^\$ActionQueueType', line: '$ActionQueueType LinkedList' }
+  - { regexp: '^\$ActionQueueFileName', line: '$ActionQueueFileName syslog_queue' }
+  - { regexp: '^\$ActionResumeRetryCount ', line: '$ActionResumeRetryCount -1' }
+  - { regexp: '^\$ActionQueueSaveOnShutdown', line: '$ActionQueueSaveOnShutdown on' }
+  - { regexp: '^\$ActionQueueMaxDiskSpace', line: '$ActionQueueMaxDiskSpace 1024m' }
+  - { regexp: '^\$ActionQueueTimeoutEnqueue', line: '$ActionQueueTimeoutEnqueue 0' }
+
+# syslog-ng
+syslog_ng_config: /etc/syslog-ng/syslog-ng.conf
+syslog_ng_siem_config: /etc/syslog-ng/10-siem.conf
+
+###################################################################################################
+### Distribution-specific options
+###################################################################################################
+
+# Supported Linux distributions
+linux_supported:
+  - { name: 'RedHat', min_ver: 7, max_ver: 8 }
+  - { name: 'CentOS', min_ver: 7, max_ver: 8 }
+  - { name: 'OracleLinux', min_ver: 7, max_ver: 8 }
+  - { name: 'Debian', min_ver: 9, max_ver: 12 }
+  - { name: 'Ubuntu', min_ver: 16, max_ver: 22 }
+  - { name: 'Astra Linux', min_ver: 1, max_ver: 1 }
+  - { name: 'REDOS', min_ver: 7, max_ver: 7 }
+  - { name: 'RED SOFT', min_ver: 8, max_ver: 8 }
+
+# Auditd v2.8 packages name for Ubuntu 16.04
+ubuntu1604_auditd_packages:
+  - libaudit-common_2.8.2-1ubuntu1_all.deb
+  - libaudit1_2.8.2-1ubuntu1_amd64.deb
+  - libauparse0_2.8.2-1ubuntu1_amd64.deb
+  - auditd_2.8.2-1ubuntu1_amd64.deb
+
+
+packages_dirs:
+  rpm:
+    - { dist: 'CentOS', ver: '7', dir_name: 'centos7' }
+    - { dist: 'CentOS', ver: '8', dir_name: 'centos8' }
+    - { dist: 'OracleLinux', ver: '7', dir_name: 'oel7' }
+    - { dist: 'OracleLinux', ver: '8', dir_name: 'oel8' }
+    - { dist: 'RedHat', ver: '7', dir_name: 'rhel7' }
+    - { dist: 'RedHat', ver: '8', dir_name: 'rhel8' }
+    - { dist: 'REDOS', ver: '7', dir_name: 'murom7' }
+  deb:
+    - { dist: 'Debian', ver: 'stretch', dir_name: 'debian9' }
+    - { dist: 'Debian', ver: 'buster', dir_name: 'debian10' }
+    - { dist: 'Debian', ver: 'bullseye', dir_name: 'debian11' }
+    - { dist: 'Debian', ver: 'bookworm', dir_name: 'debian12' }
+    - { dist: 'Ubuntu', ver: 'xenial', dir_name: 'ubuntu1604' }
+    - { dist: 'Ubuntu', ver: 'bionic', dir_name: 'ubuntu1804' }
+    - { dist: 'Ubuntu', ver: 'focal', dir_name: 'ubuntu2004' }
+    - { dist: 'Ubuntu', ver: 'jammy', dir_name: 'ubuntu2204' }
+    - { dist: 'Astra Linux', ver: '1.7_x86-64', dir_name: 'astra17' }

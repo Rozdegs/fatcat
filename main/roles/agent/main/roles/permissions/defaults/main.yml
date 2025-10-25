@@ -1,0 +1,313 @@
+---
+# Список директорий и прав
+directories_permissions:
+  - path: /etc/pki/
+    mode: '0755'
+    owner: root
+    group: root
+
+  - path: /etc/ssl/
+    mode: '0755'
+    owner: root
+    group: root
+
+  - path: /etc/profile.d/
+    mode: '0755'
+    owner: root
+    group: root
+
+  - path: /home/administrator/.ssh/
+    mode: '0600'
+    owner: administrator
+    group: administrator
+
+  - path: /etc/sudoers.d/
+    mode: '0750'
+    owner: root
+    group: root
+
+  - path: /etc/cron.monthly/
+    mode: '0700'
+    owner: root
+    group: root
+
+  - path: /etc/cron.weekly/
+    mode: '0700'
+    owner: root
+    group: root
+
+  - path: /etc/cron.daily/
+    mode: '0700'
+    owner: root
+    group: root
+
+  - path: /etc/cron.hourly/
+    mode: '0700'
+    owner: root
+    group: root
+
+  - path: /etc/cron.d/
+    mode: '0600'
+    owner: root
+    group: root
+
+files_permissions:
+  - path: /etc/crontab
+    mode: '0600'
+    owner: root
+    group: root
+
+  - path: /etc/cron.hourly/0anacron 
+    mode: '0700'
+    owner: root
+    group: root
+
+  - path: /etc/cron.daily/afick_cron
+    mode: '0700'
+    owner: root
+    group: root
+
+  - path: /etc/sudoers
+    mode: '0440'
+    owner: root
+    group: root
+
+  - path: /etc/ssh/sshd_config
+    mode: '0600'
+    owner: root
+    group: root
+
+  - path: /etc/ssh/ssh_config
+    mode: '0600'
+    owner: root
+    group: root
+
+  - path: /home/administrator/.ssh/authorized_keys
+    mode: '0600'
+    owner: administrator
+    group: administrator
+
+  - path: /etc/security/pwquality.conf
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/security/pwhistory.conf
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/pam.d/su
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/authselect/system-auth
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/authselect/password-auth
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/login.defs
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/samba/smb.conf
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/fstab
+    mode: '0600'
+    owner: root
+    group: root
+
+  - path: /etc/yum.repos.d/RedOS-Base.repo
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/yum.repos.d/RedOS-Updates.repo
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/yum.repos.d/misc_redos.repo
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /usr/sbin/grub2-mkconfig
+    mode: '0700'
+    owner: root
+    group: root
+
+  - path: /boot/grub2/grub.cfg
+    mode: '0600'
+    owner: root
+    group: root
+
+  - path: /boot/grub2/user.cfg
+    mode: '0600'
+    owner: root
+    group: root
+
+  - path: /etc/default/grub
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/chrony.conf
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/resolv.conf
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/hosts
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/hostname
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/sysctl.conf
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/audit/auditd.conf
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/audit/audit.rules
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/audit/auditd.conf
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/audit/rules.d/audit.rules
+    mode: '0600'
+    owner: root
+    group: root
+
+  - path: /etc/audit/audit-stop.rules
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/syslog-ng/syslog-ng.conf
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/systemd/journald.conf
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/shadow
+    mode: '0000'
+    owner: root
+    group: root
+
+  - path: /etc/shadow-
+    mode: '0000'
+    owner: root
+    group: root
+
+  - path: /etc/gshadow
+    mode: '0000'
+    owner: root
+    group: root
+
+  - path: /etc/gshadow-
+    mode: '0000'
+    owner: root
+    group: root
+
+  - path: /etc/passwd
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/passwd-
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/group
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/group-
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/ufw/ufw.conf
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/default/ufw
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/ufw/user.rules
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/ufw/after.rules
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/ufw/before.rules
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/motd
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/issue
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/issue.net
+    mode: '0644'
+    owner: root
+    group: root
+
+  - path: /etc/cups/cupsd.conf
+    mode: '0640'
+    owner: root
+    group: root
+
+  - path: /etc/selinux/config
+    mode: '0644'
+    owner: root
+    group: root

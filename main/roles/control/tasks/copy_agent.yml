@@ -1,0 +1,17 @@
+---
+- name: Создание директории /opt/fatcat/ на удалённых узлах
+  file:
+    path: /opt/fatcat/
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Копирование роли FATCAT Agent на удалённые узлы
+  copy:
+    src: "{{ playbook_dir }}/roles/agent/"
+    dest: /opt/fatcat/
+    owner: root
+    group: root
+    mode: '0755'
+

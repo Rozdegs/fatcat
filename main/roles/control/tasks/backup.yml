@@ -1,0 +1,29 @@
+---
+- name: Проверить, существует ли директория /opt/fatcat
+  stat:
+    path: /opt/fatcat
+  register: fatcat_dir
+
+- name: Проверить наличие предыдущего бэкапа
+  find:
+    paths: /etc/
+    patterns: "fatcat_backup_*.tar.gz"
+  register: existing_backup
+  when: fatcat_dir.stat.exists
+
+- name: Удалить предыдущий бэкап (если есть)
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ existing_backup.files | default([]) }}"
+  when:
+    - fatcat_dir.stat.exists
+    - existing_backup.matched is defined
+    - existing_backup.matched > 0
+
+- name: Создать новый бэкап директории /opt/fatcat
+  archive:
+    path: /opt/fatcat
+    dest: "/etc/fatcat_backup_{{ ansible_date_time.date }}.tar.gz"
+    format: gz
+  when: fatcat_dir.stat.exists

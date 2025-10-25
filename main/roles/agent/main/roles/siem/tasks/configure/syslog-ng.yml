@@ -1,0 +1,37 @@
+---
+- name: Include agent group config file
+  include_vars:
+    file: siem_agents.yml
+
+- name: Adding include option
+  lineinfile:
+    dest: "{{ syslog_ng_config }}"
+    line: "@include \"{{ syslog_ng_siem_config }}\""
+    firstmatch: yes
+    state: present
+
+- name: Pushing syslog-ng SIEM config
+  template:
+    src: syslog-ng_10-siem.conf.j2
+    dest: "{{ syslog_ng_siem_config }}"
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Disabling Auditd log file writing
+  when: auditd_write_logs
+  replace:
+    backup: yes
+    path: "{{ syslog_ng_config }}"
+    regexp: '(^.+)not facility\(auth,(.*)$'
+    replace: '\1not facility(local6,auth,\2'
+
+- name: Enabling syslog-ng service
+  service:
+    name: syslog-ng
+    enabled: yes
+
+- name: Restarting syslog-ng service
+  service:
+    name: syslog-ng
+    state: restarted

@@ -1,0 +1,16 @@
+---
+- name: Trying to install audispd-plugins from repo 
+  block:
+    - name: Trying to install audispd-plugins from repo (Deb-based)
+      when: radhat_famaly == "false"
+      apt:
+        name: audispd-plugins
+        state: latest
+      ignore_errors: true
+    
+    - name: Trying to install audispd-plugins from repo (RHEL-based)
+      when: radhat_famaly == "true"
+      dnf:
+        name: audispd-plugins
+        state: latest
+      ignore_errors: true

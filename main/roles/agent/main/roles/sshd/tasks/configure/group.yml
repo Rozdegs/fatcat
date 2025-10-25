@@ -1,0 +1,26 @@
+---
+
+- name: Проверить, существует ли группа sshuser
+  shell: getent group sshuser
+  register: sshuser_group
+  ignore_errors: yes
+
+- name: Создать группу sshuser, если она отсутствует
+  group:
+    name: sshuser
+    state: present
+  when: sshuser_group.rc != 0
+
+- name: Проверить наличие пользователей перед добавлением
+  shell: id -u {{ item }}
+  register: user_check
+  ignore_errors: yes
+  loop: "{{ new_users }}"
+
+- name: Добавить существующих пользователей в группу sshuser
+  user:
+    name: "{{ item.item }}"
+    groups: sshuser
+    append: yes
+  when: item.rc == 0
+  loop: "{{ user_check.results }}"
